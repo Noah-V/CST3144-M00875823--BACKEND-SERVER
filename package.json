@@ -1,0 +1,23 @@
+{
+  "name": "cst3144-m00875823--backend-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Noah-V/CST3144-M00875823--BACKEND-SERVER.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Noah-V/CST3144-M00875823--BACKEND-SERVER/issues"
+  },
+  "homepage": "https://github.com/Noah-V/CST3144-M00875823--BACKEND-SERVER#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0"
+  }
+}
