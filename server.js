@@ -1,125 +1,34 @@
 var express = require("express");
 var cors = require("cors");
 var path = require("path");
+require("dotenv").config({ path: "./config.env" });
+
+const { MongoClient, ObjectId } = require("mongodb");
+const uri = process.env.MONGODB_PREFIX + process.env.MONGODB_USERNAME + ":" + process.env.MONGODB_PASSWORD + process.env.MONGODB_URL;
+const client = new MongoClient(uri);
+const db = client.db("fullstack-lessons");
+
+async function connectToMongoDB() {
+	try {
+		await client.connect();
+		console.log("MongoDB connection done");
+		return client;
+	} catch (err) {
+		console.dir(err);
+	}
+}
+
+async function collectionExists(name) {
+	const collections = await db.listCollections({ name: name }).toArray();
+	return collections.length > 0;
+}
+
+connectToMongoDB();
+
 var app = express();
-
-app.set("json spaces", 2);
-
 const PORT = 3000;
 
-const arrayOfLessons = [
-	{
-		id: 1001,
-		subject: "Computer Science",
-		location: "Mauritius",
-		price: "2,000",
-		imageProps: {
-			path: "images/example-class.jpg",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1002,
-		subject: "Mathematics",
-		location: "Mauritius",
-		price: "1,000",
-		imageProps: {
-			path: "images/class2.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1003,
-		subject: "Law",
-		location: "Mauritius",
-		price: "3,000",
-		imageProps: {
-			path: "images/class3.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1004,
-		subject: "Agriculture",
-		location: "Hendon",
-		price: "13,000",
-		imageProps: {
-			path: "images/class3.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1005,
-		subject: "Cyber Security",
-		location: "Dubai",
-		price: "9,000",
-		imageProps: {
-			path: "images/class3.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1006,
-		subject: "Philosophy",
-		location: "Port Louis",
-		price: "30,000",
-		imageProps: {
-			path: "images/class3.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1007,
-		subject: "British History",
-		location: "UK",
-		price: "500",
-		imageProps: {
-			path: "images/class3.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1008,
-		subject: "Branding",
-		location: "Mauritius",
-		price: "34,000",
-		imageProps: {
-			path: "images/class3.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1009,
-		subject: "AI and Machine Learning",
-		location: "Hendon",
-		price: "35,000",
-		imageProps: {
-			path: "images/class3.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-	{
-		id: 1010,
-		subject: "Computer Science",
-		location: "Mauritius",
-		price: "4,000",
-		imageProps: {
-			path: "images/class3.png",
-			alt: "Picture of classroom",
-		},
-		availability: 5,
-	},
-];
-
+app.set("json spaces", 2);
 app.use(cors());
 app.use(express.json());
 
@@ -135,21 +44,67 @@ app.use("/images", function (request, response) {
 	response.status(404).json({ error: "Image " + request.url + " does not exist" });
 });
 
-app.get("/lessons", function (request, response) {
-	response.json(arrayOfLessons);
+app.get("/lessons", async function (request, response) {
+	try {
+		if (!(await collectionExists("lessons"))) {
+			return response.status(404).json({ error: "Lessons collection is not available in the database" });
+		}
+		let collection = db.collection("lessons");
+		let results = await collection.find({}).toArray();
+		response.send(results);
+	} catch (err) {
+		console.error(err);
+		response.status(500).json({ error: "Failed to load lessons from the server" });
+	}
 });
 
-app.post("/orders", function (request, response) {
-	const order = request.body;
-	console.log("New order from " + order.firstName + " " + order.lastName);
-	console.log("Telephone: " + order.telephone);
-	console.log("Lesson IDs: " + order.lessonIDs.join(", "));
-	console.log("Number of spaces: " + order.spaces);
-	response.json({ message: "Order received for " + order.firstName + " " + order.lastName });
+app.post("/orders", async function (request, response) {
+	try {
+		if (!(await collectionExists("orders"))) {
+			return response.status(404).json({ error: "Orders collection is not available in the database" });
+		}
+		var body = request.body;
+		let collection = db.collection("orders");
+		let result = await collection.insertOne(body);
+		response.send(result);
+	} catch (err) {
+		console.error(err);
+		response.status(500).json({ error: "Failed to save order to the server" });
+	}
+});
+
+app.put("/lessons/:_id", async function (request, response) {
+	var body = request.body;
+	let collection = db.collection("lessons");
+	let requestId = request.params._id;
+	try {
+		if (!(await collectionExists("lessons"))) {
+			return response.status(404).json({ error: "Lessons collection is not available in the database" });
+		}
+		if (!ObjectId.isValid(requestId)) {
+			return response.status(400).json({ error: "Invalid lesson ID" });
+		}
+
+		const query = { _id: new ObjectId(requestId) };
+		const updates = {
+			$set: body,
+		};
+		let result = await collection.updateOne(query, updates);
+		if (result.matchedCount === 0) {
+			return response.status(404).json({ error: "Lesson not found" });
+		}
+		response.send(result);
+		console.log(result);
+	} catch (err) {
+		console.error(err);
+		response.status(500).json({ error: "Failed to update lesson" });
+	}
 });
 
 app.use(function (request, response) {
-	response.status(404).send("404 - Page Not Found!");
+	response.status(404).json({ error: "Route " + request.url + " is not available" });
 });
 
-app.listen(PORT, console.log("App is live at ", PORT));
+app.listen(PORT, function () {
+	console.log("App is live at", PORT);
+});
